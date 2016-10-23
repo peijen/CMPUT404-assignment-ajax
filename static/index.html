@@ -6,7 +6,7 @@
     <meta content='width=device-width; height=device-height; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;' name='viewport' />
     <meta name="viewport" content="width=device-width" />
     <meta name="license" content="
-        Copyright 2013 Abram Hindle
+        Copyright 2013 Abram Hindle,Chris Lin
         
         Licensed under the Apache License, Version 2.0 (the "License");
         you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
     <script src="json2.js"></script>
   </head> 
   <body bgcolor="black" height="100%" width="100%"> 
-    <canvas id="c" width="100%" height="100%" style="-webkit-tap-highlight-color: transparent;"></canvas> 
+    <canvas id="c" width="100%" height="100%" style="-webkit-tap-highlight-color: transparent;"></canvas>
     <script>
 var canvas = document.getElementById('c');
 var host = window.location.host;
@@ -40,6 +40,7 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
                 if (xhr.status==200) {
                     //XXX: parse some JSON from the request!
                     //XXX: Pass the data to the callback!
+					callback(JSON.parse(xhr.responseText));
                 }
             } 
             catch(e) {
@@ -50,6 +51,10 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
     //XXX: POST to a URL
     //XXX: set the mimetype and the accept headers!
     // Remember to use application/json !
+	xhr.open("POST", url,true);
+	xhr.setRequestHeader("Content-Type", "appication/json");
+	xhr.setRequestHeader("Accept", "application/json");
+	xhr.send(JSON.stringify(objects));
 }
 
 
@@ -69,6 +74,44 @@ function drawCircle(context,entity) {
         stroke();                                
     }
 }
+
+// drawStar by markE and Andrei Volgin from  source: http://stackoverflow.com/questions/25837158/how-to-draw-a-star-by-using-canvas-html5
+function drawStar(context,entity,spikes,outerRadius,innerRadius){
+	//spikes indicates number of spikes for a star
+	//outerRadius indicates size of the outer spikes
+	//innerRadius indicates size of the inner spikes
+	with(context){
+	lineWidth = 3;
+	var rot = Math.PI/2*3;
+	var x = entity["x"];
+	var y = entity["y"];
+	var step = Math.PI/spikes;
+	beginPath();
+	moveTo(entity["x"], entity["y"] - outerRadius) //starting point
+	//drawing the spikes
+	for (i = 0; i < spikes; i++) {
+	    //drawing outer spikes
+	    x = entity["x"] + Math.cos(rot) * outerRadius;
+        y = entity["y"] + Math.sin(rot) * outerRadius;
+        lineTo(x, y)
+        rot += step
+		//drawing inner spikes
+		x = entity["x"] + Math.cos(rot) * innerRadius;
+        y = entity["y"]+ Math.sin(rot) * innerRadius;
+        lineTo(x, y)
+        rot += step
+	}
+	lineTo(entity["x"],entity["y"] - outerRadius);//moving destination
+	closePath();
+	fillStyle = entity["colour"];
+	strokeStyle = fillStyle;
+    stroke();
+	}
+	
+}
+
+
+
 
 function prepEntity(entity) {
     if (!entity["colour"]) {
@@ -94,7 +137,12 @@ function renderFrame() {
     clearFrame();
     for (var key in world) {
         var entity = world[key];
+		//draw circle only for purple color
+	if(entity["colour"] ==='purple'){
         drawCircle(context,prepEntity(entity));
+		}else{
+		drawStar(context,prepEntity(entity),6,30,15);
+		}
     }
 }
 
@@ -138,6 +186,9 @@ function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
     //XXX: Send a XHTML Request that updates the entity you just  modified!
+	sendJSONXMLHTTPRequest("http://127.0.0.1:5000/entity/"+entity,data,function(data){
+	});
+	
 
 }
 
@@ -255,13 +306,18 @@ mouse.mouseuppers.push(function(x,y,clicked,e) {
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
-                          'radius':10});
+    addEntityWithoutName({'x':x,'y':y,'colour':'purple',
+                          'radius':15});
 });
 
 
 function update() {
     //XXX: TODO Get the world from the webservice using a XMLHTTPRequest
+	sendJSONXMLHTTPRequest("http://127.0.0.1:5000/world", null, function(data){
+		world = data;
+		drawNextFrame();
+	});
+	
     drawFrame();
 }
 
